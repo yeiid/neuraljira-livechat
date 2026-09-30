@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # 1. FRONTEND: PWA Neuraljira (Nginx Alpine)
+  # ==========================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    networks:
+      - dokploy-network
+    labels:
+      - "traefik.enable=true"
+      # Dominio principal para la PWA en Dokploy
+      - "traefik.http.routers.neuraljira-fe.rule=Host(`${DOMAIN:-chat.neuraljira.com}`)"
+      - "traefik.http.routers.neuraljira-fe.entrypoints=websecure"
+      - "traefik.http.routers.neuraljira-fe.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.neuraljira-fe.priority=1"
+      - "traefik.http.services.neuraljira-fe.loadbalancer.server.port=80"
+
+  # ==========================================
+  # 2. BACKEND: Go Fiber WebSockets Hub
+  # ==========================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-4000}:4000"
+    environment:
+      - PORT=4000
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+    networks:
+      - dokploy-network
+    labels:
+      - "traefik.enable=true"
+      # Enrutar /ws (WebSockets) y /api (REST/Health) al backend de Go en Dokploy
+      - "traefik.http.routers.neuraljira-be.rule=Host(`${DOMAIN:-chat.neuraljira.com}`) && (PathPrefix(`/ws`) || PathPrefix(`/api`))"
+      - "traefik.http.routers.neuraljira-be.entrypoints=websecure"
+      - "traefik.http.routers.neuraljira-be.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.neuraljira-be.priority=10"
+      - "traefik.http.services.neuraljira-be.loadbalancer.server.port=4000"
+
+  # ==========================================
+  # 3. REDIS: Bus de eventos Pub/Sub y Caché
+  # ==========================================
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - dokploy-network
+
+volumes:
+  redis_data:
+
+networks:
+  dokploy-network:
+    external: false
