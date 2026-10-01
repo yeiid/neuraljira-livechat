@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// Hub mantiene las salas activas y orquesta el enrutamiento de mensajes
+// Hub mantiene las salas activas y orquesta el enrutamiento de mensajes y WebRTC
 type Hub struct {
 	Rooms      map[string]*Room
 	Register   chan *Client
@@ -34,8 +34,15 @@ func (h *Hub) GetOrCreateRoom(roomID string) *Room {
 	room, exists := h.Rooms[roomID]
 	if !exists {
 		room = NewRoom(roomID)
+
+		// Cargar historial previo desde PostgreSQL si está disponible
+		dbHistory := LoadRecentMessagesDB(roomID, 50)
+		if len(dbHistory) > 0 {
+			room.History = dbHistory
+		}
+
 		h.Rooms[roomID] = room
-		log.Printf("[Hub] Nueva sala de live creada: %s", roomID)
+		log.Printf("[Hub] Nueva sala de live creada: %s (Historial cargado: %d)", roomID, len(room.History))
 	}
 	return room
 }
@@ -48,10 +55,14 @@ func (h *Hub) Run() {
 			room.Mu.Lock()
 			room.Clients[client] = true
 			viewerCount := len(room.Clients)
-			history := room.GetHistory()
+			history := make([]Message, len(room.History))
+			copy(history, room.History)
+			isLive := room.IsLive
+			streamMode := room.StreamMode
+			hostID := room.HostID
 			room.Mu.Unlock()
 
-			log.Printf("[Hub] Usuario conectado: %s (Sala: %s, Total: %d)", client.Username, client.RoomID, viewerCount)
+			log.Printf("[Hub] Usuario conectado: %s (Sala: %s, Total: %d, Rol: %s)", client.Username, client.RoomID, viewerCount, client.Role)
 
 			// Enviar historial previo al usuario recién conectado
 			historyMsg := Message{
@@ -72,6 +83,22 @@ func (h *Hub) Run() {
 			default:
 			}
 
+			// Si la sala está en vivo, notificar al nuevo espectador para activar el reproductor
+			if isLive {
+				statusMsg, _ := json.Marshal(Message{
+					ID:        uuid.New().String(),
+					Type:      EventStreamStatus,
+					RoomID:    client.RoomID,
+					UserID:    hostID,
+					Text:      streamMode,
+					CreatedAt: time.Now().UnixMilli(),
+				})
+				select {
+				case client.Send <- statusMsg:
+				default:
+				}
+			}
+
 			// Notificar presencia actualizada a la sala
 			h.broadcastPresence(client.RoomID, viewerCount)
 
@@ -81,6 +108,7 @@ func (h *Hub) Run() {
 					ID:        uuid.New().String(),
 					Type:      EventUserJoin,
 					RoomID:    client.RoomID,
+					UserID:    client.UserID,
 					Sender:    client.Username,
 					Avatar:    client.Avatar,
 					Role:      client.Role,
@@ -102,15 +130,21 @@ func (h *Hub) Run() {
 					close(client.Send)
 				}
 				viewerCount := len(room.Clients)
+				// Si el host que estaba transmitiendo se desconecta, detener el directo
+				wasHost := (room.IsLive && room.HostID == client.UserID)
 				room.Mu.Unlock()
+
+				if wasHost {
+					LiveManager.StopStream(client.RoomID)
+				}
 
 				log.Printf("[Hub] Usuario desconectado: %s (Sala: %s, Restantes: %d)", client.Username, client.RoomID, viewerCount)
 
 				// Notificar presencia actualizada
 				h.broadcastPresence(client.RoomID, viewerCount)
 
-				// Limpiar sala si queda vacía tras un tiempo
-				if viewerCount == 0 {
+				// Limpiar sala si queda vacía tras un tiempo (y no está en directo)
+				if viewerCount == 0 && !wasHost {
 					h.Mu.Lock()
 					delete(h.Rooms, client.RoomID)
 					h.Mu.Unlock()
@@ -144,8 +178,9 @@ func (h *Hub) BroadcastToRoom(roomID string, msg Message, saveHistory bool) {
 		return
 	}
 
-	if saveHistory && msg.Type == EventChat {
+	if saveHistory && (msg.Type == EventChat || msg.Type == EventFile) {
 		room.AddHistory(msg)
+		SaveMessageDB(&msg)
 	}
 
 	payload, err := json.Marshal(msg)

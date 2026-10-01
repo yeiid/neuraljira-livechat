@@ -1,96 +1,72 @@
-# ⚡ Neuraljira LiveChat (PWA + Go Fiber WebSockets)
+# ⚡ Neuraljira Live Platform (PWA + Go Fiber + WebRTC + PostgreSQL + Google Drive 5TB)
 
-Aplicación de mensajería en tiempo real y alta concurrencia diseñada para directos y streaming en vivo con la identidad de marca **Neuraljira**. 
-
-Construida con un backend en **Go (Fiber v2 + WebSockets)** de ultra bajo consumo y un frontend en **React + Vite + Tailwind CSS + PWA (instalable en móviles y PC)**, optimizada para desplegarse en **Dokploy**.
+Plataforma integral de mensajería y streaming en tiempo real diseñada para directos, presentaciones y colaboración con la identidad de marca **Neuraljira**.
 
 ---
 
-## 🌟 Características Principales
+## 🌟 Nuevas Funcionalidades Implementadas
 
-* ⚡ **Ultra Bajo Consumo:** El backend en Go consume apenas ~20MB de memoria RAM y compila en una imagen Docker de solo ~18MB.
-* 📱 **PWA Nativa:** Funciona como aplicación instalable en Android, iOS y Escritorio (con Service Worker, offline cache y Web Manifest).
-* 💬 **Chat Dinámico para Directos:**
-  * Soporte de múltiples salas vía URL: `/live?room=nombre-sala`.
-  * Contador de espectadores en vivo en tiempo real.
-  * Reacciones animadas flotantes (❤️, 🔥, 🚀, 👏, 💡, 💯) estilo TikTok/Instagram Live.
-  * Autoscroll inteligente (se detiene si subes a leer mensajes anteriores y muestra botón de alerta).
-  * Selector de avatares estilo Cyberpunk y roles visuales (**HOST**, **MOD**, **VIP**, **VIEWER**).
-  * Reconexión automática con exponential backoff.
-* 🚀 **Listo para Dokploy:** Configuración con Traefik, soporte nativo de WebSockets (`WSS`) y certificados SSL automáticos con Let's Encrypt.
+### 1. 🔐 Autenticación de Usuarios y Persistencia (PostgreSQL 16)
+* **Registro y Login:** Autenticación segura mediante contraseñas cifradas con **bcrypt** y tokens **JWT** persistentes (sesiones de 7 días).
+* **Base de Datos PostgreSQL:** Almacenamiento y persistencia en tiempo real de usuarios, salas, mensajes e historial de archivos compartidos usando GORM.
+* **Roles definidos:**
+  * 👑 **Host:** Administrador del directo con capacidad para emitir pantalla y cámara en tiempo real.
+  * 🛡️ **Mod:** Moderador de la sala.
+  * 💎 **VIP:** Espectador destacado.
+  * 👁️ **Viewer:** Espectador estándar.
+* **Modo Invitado:** Acceso instantáneo con un clic para usuarios sin cuenta previa.
 
----
+### 2. 📁 Compartir Archivos Pesados con tus 5TB de Google Drive
+* **Subida en Streaming por Chunks (Resumable Upload):** El backend de Go transfiere archivos pesados por chunks directamente hacia la API de Google Drive, **sin agotar la memoria RAM ni el disco de tu VPS en Dokploy**.
+* **Enlaces Compartibles:** Genera automáticamente enlaces de visualización previa y descarga directa para todos los participantes del directo.
+* **Tarjetas Interactivas en el Chat:** Previsualización de imágenes, reproductor de video en línea, reproductor de audio y tarjetas de descarga con tamaño formateado (MB / GB) y enlace a Drive.
+* **Fallback Automático:** Si no hay credenciales de Google Drive configuradas, la plataforma almacena automáticamente los archivos en almacenamiento local seguro.
 
-## 🏗️ Arquitectura del Proyecto
-
-```
-neuraljira-livechat/
-├── backend/                  # Servidor en Go (Fiber + WebSockets)
-│   ├── main.go               # Enrutador HTTP, CORS, health check y WS
-│   ├── hub.go                # Hub concurrente con Goroutines y salas
-│   ├── models.go             # Estructuras de mensajes y eventos
-│   ├── go.mod                # Dependencias Go
-│   └── Dockerfile            # Compilación multi-stage (~18MB)
-├── frontend/                 # Aplicación PWA
-│   ├── src/
-│   │   ├── components/       # Header, MessageList, MessageInput, etc.
-│   │   ├── hooks/            # useLiveChat (WebSocket hook)
-│   │   ├── types.ts          # Tipos e interfaces
-│   │   ├── App.tsx           # Contenedor principal responsive
-│   │   └── main.tsx          # Entrada y registro de Service Worker
-│   ├── public/               # Favicon SVG y assets PWA
-│   ├── nginx.conf            # Configuración Nginx para SPA & PWA
-│   ├── vite.config.ts        # Vite + plugin PWA
-│   └── Dockerfile            # Multi-stage Nginx Alpine
-├── docker-compose.yml        # Orquestación Dokploy con Traefik y Redis
-└── .env.example              # Variables de entorno
-```
+### 3. 🔴 Live Streaming de Ultra Baja Latencia (<300ms) desde PC
+* **WebRTC Nativo en Go (Pion):** Transmisión de video y audio en tiempo real con latencia inferior a medio segundo.
+* **Para el Host en PC:**
+  * **Compartir Pantalla Completa, Ventana de App o Pestaña del Navegador** con audio del sistema integrado.
+  * **Cámara Web y Micrófono** con botón para silenciar audio o apagar video.
+* **Para los Espectadores (PWA Móvil y PC):**
+  * Reproductor WebRTC adaptativo encima del chat con auto-reproducción sincronizada.
+  * Modo **Pantalla Completa** y **Picture-in-Picture (PiP)** para seguir viendo el live mientras navegas o chateas.
 
 ---
 
-## 🚀 Despliegue en Dokploy (Paso a Paso)
+## 🚀 Despliegue en Dokploy
 
-### Opción 1: Despliegue con Docker Compose (Recomendado)
-
-1. **Sube este repositorio a tu GitHub o GitLab.**
-2. En tu panel de **Dokploy**:
-   * Haz clic en **Projects** -> Selecciona tu proyecto o crea uno nuevo.
-   * Haz clic en **Create Service** y selecciona **Compose**.
-   * Conecta tu repositorio Git o pega el contenido de `docker-compose.yml`.
-3. **Configura las Variables de Entorno en Dokploy:**
+En tu panel de **Dokploy**:
+1. Conecta este repositorio en un servicio tipo **Compose**.
+2. Configura las variables de entorno en la pestaña **Environment Variables**:
    ```env
-   DOMAIN=chat.tudominio.com
+   DOMAIN=chat.neuraljira.com
    PORT=4000
+   
+   # PostgreSQL
+   POSTGRES_USER=neuraluser
+   POSTGRES_PASSWORD=neuralpass123
+   POSTGRES_DB=neuraljira_live
+   
+   # JWT Secret
+   JWT_SECRET=tu_secreto_super_seguro_2026
+   
+   # Google Drive 5TB (Opcional, activa el almacenamiento ilimitado en tu Drive)
+   GOOGLE_DRIVE_FOLDER_ID=id_de_tu_carpeta_de_drive
+   GOOGLE_SERVICE_ACCOUNT_KEY={"type":"service_account",...}
    ```
-4. **Asigna el Dominio:**
-   * En la pestaña **Domains** de tu servicio en Dokploy, apunta tu dominio `chat.tudominio.com` a la IP de tu VPS con SSL activado (Let's Encrypt).
-5. Haz clic en **Deploy**. ¡Listo! Dokploy levantará el frontend, el backend en Go y Redis automáticamente.
+3. En la pestaña **Domains**, asigna `chat.neuraljira.com` con SSL activado (Let's Encrypt).
+4. Haz clic en **Deploy**. Dokploy levantará los 4 servicios (Frontend PWA, Backend Go, PostgreSQL 16 y Redis) automáticamente.
 
 ---
 
-## 💻 Desarrollo Local (Sin Docker)
+## 🔑 Cómo Conectar tus 5TB de Google Drive
 
-### 1. Iniciar el Backend (Go):
-```bash
-cd backend
-go run .
-# El backend iniciará en http://localhost:4000
-```
-
-### 2. Iniciar el Frontend (PWA):
-```bash
-cd frontend
-npm install
-npm run dev
-# Abrir en el navegador http://localhost:3000
-```
-
----
-
-## 📲 Cómo Probar e Instalar la PWA en Móviles
-
-1. Entra desde tu teléfono (Chrome en Android o Safari en iOS) a la URL de tu directo:
-   `https://chat.tudominio.com?room=directo-especial`
-2. **Android:** Aparecerá el banner de instalación *"Instala Neuraljira Live en tu dispositivo"* o pulsa los 3 puntos -> **Instalar aplicación**.
-3. **iOS (iPhone/iPad):** Pulsa el botón de Compartir en Safari -> **Añadir a pantalla de inicio**.
-4. ¡La app se abrirá a pantalla completa sin barras de navegador, exactamente igual que una app nativa de la tienda!
+1. Ve a la consola de [Google Cloud Console](https://console.cloud.google.com/).
+2. Crea un proyecto y habilita la **Google Drive API**.
+3. En **IAM & Admin** -> **Cuentas de servicio**, crea una cuenta de servicio (ej: `neuraljira-drive-uploader`).
+4. Genera una clave JSON y descárgala.
+5. Ve a tu **Google Drive (5TB)**:
+   * Crea una carpeta llamada por ejemplo `Neuraljira Directos`.
+   * Haz clic derecho -> **Compartir** -> Pega el correo de la cuenta de servicio y dale permisos de **Editor**.
+   * Copia el ID de la carpeta de la URL de Drive (los caracteres después de `/folders/...`).
+6. En Dokploy (o tu `.env`), define `GOOGLE_DRIVE_FOLDER_ID` con ese ID y `GOOGLE_SERVICE_ACCOUNT_KEY` con el contenido del JSON.

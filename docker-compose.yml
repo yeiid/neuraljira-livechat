@@ -9,10 +9,33 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     restart: unless-stopped
+    stop_grace_period: 10s
     ports:
       - "${FRONTEND_PORT:-3000}:80"
     networks:
       - dokploy-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 128M
+        reservations:
+          cpus: '0.05'
+          memory: 32M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:80/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      backend:
+        condition: service_healthy
     labels:
       - "traefik.enable=true"
       # Dominio principal para la PWA en Dokploy
@@ -23,25 +46,53 @@ services:
       - "traefik.http.services.neuraljira-fe.loadbalancer.server.port=80"
 
   # ==========================================
-  # 2. BACKEND: Go Fiber WebSockets Hub
+  # 2. BACKEND: Go Fiber + WebSockets + WebRTC
   # ==========================================
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     restart: unless-stopped
+    stop_grace_period: 15s
     ports:
       - "${BACKEND_PORT:-4000}:4000"
+      - "50000-50050:50000-50050/udp" # Rango de puertos UDP para WebRTC SFU
     environment:
       - PORT=4000
       - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgres://${POSTGRES_USER:-neuraluser}:${POSTGRES_PASSWORD:-neuralpass123}@postgres:5432/${POSTGRES_DB:-neuraljira_live}?sslmode=disable
+      - JWT_SECRET=${JWT_SECRET:-neuraljira_live_ultra_jwt_secret_2026}
+      - GOOGLE_DRIVE_FOLDER_ID=${GOOGLE_DRIVE_FOLDER_ID:-}
+      - GOOGLE_SERVICE_ACCOUNT_KEY=${GOOGLE_SERVICE_ACCOUNT_KEY:-}
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:4000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     depends_on:
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - dokploy-network
     labels:
       - "traefik.enable=true"
-      # Enrutar /ws (WebSockets) y /api (REST/Health) al backend de Go en Dokploy
+      # Enrutar /ws (WebSockets) y /api (REST/Auth/Upload) al backend de Go en Dokploy
       - "traefik.http.routers.neuraljira-be.rule=Host(`${DOMAIN:-chat.neuraljira.com}`) && (PathPrefix(`/ws`) || PathPrefix(`/api`))"
       - "traefik.http.routers.neuraljira-be.entrypoints=websecure"
       - "traefik.http.routers.neuraljira-be.tls.certresolver=letsencrypt"
@@ -49,21 +100,78 @@ services:
       - "traefik.http.services.neuraljira-be.loadbalancer.server.port=4000"
 
   # ==========================================
-  # 3. REDIS: Bus de eventos Pub/Sub y Caché
+  # 3. BASE DE DATOS: PostgreSQL 16
+  # ==========================================
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    command: postgres -c shared_buffers=128MB -c max_connections=100 -c work_mem=4MB -c effective_cache_size=256MB -c maintenance_work_mem=32MB
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-neuraluser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neuralpass123}
+      POSTGRES_DB: ${POSTGRES_DB:-neuraljira_live}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-neuraluser} -d ${POSTGRES_DB:-neuraljira_live}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - dokploy-network
+
+  # ==========================================
+  # 4. REDIS: Bus de eventos Pub/Sub y Caché
   # ==========================================
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 200mb --maxmemory-policy allkeys-lru
     ports:
       - "${REDIS_PORT:-6379}:6379"
-    command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+        reservations:
+          cpus: '0.05'
+          memory: 32M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
     networks:
       - dokploy-network
 
 volumes:
   redis_data:
+  postgres_data:
 
 networks:
   dokploy-network:

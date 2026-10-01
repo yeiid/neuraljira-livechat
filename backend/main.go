@@ -28,8 +28,15 @@ func main() {
 		port = "4000"
 	}
 
+	// 1. Inicializar Base de Datos PostgreSQL
+	InitDatabase()
+
+	// 2. Inicializar Google Drive API (5TB)
+	InitGoogleDrive()
+
 	app := fiber.New(fiber.Config{
-		AppName: "Neuraljira LiveChat Backend v1.0",
+		AppName:   "Neuraljira Live Platform Backend v2.0",
+		BodyLimit: 5 * 1024 * 1024 * 1024, // Permitir subidas de hasta 5GB
 	})
 
 	app.Use(recover.New())
@@ -39,22 +46,45 @@ func main() {
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: "*",
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
-		AllowMethods: "GET, POST, OPTIONS",
+		AllowMethods: "GET, POST, OPTIONS, PUT, DELETE",
 	}))
 
 	hub := NewHub()
 	go hub.Run()
 
+	// 3. Inicializar Live Streaming WebRTC
+	InitWebRTC(hub)
+
+	// 4. Registrar Rutas de Autenticación
+	SetupAuthRoutes(app)
+
+	// 5. Registrar Rutas de Subida y Google Drive
+	SetupUploadRoutes(app, hub)
+
+	// 6. Registrar Red Social (feed + follows + stories)
+	SetupSocialRoutes(app, hub)
+
 	// Health check para Dokploy / Traefik
 	app.Get("/api/health", func(c *fiber.Ctx) error {
+		dbStatus := "connected"
+		if DB == nil {
+			dbStatus = "disconnected"
+		}
+		driveStatus := "local_fallback"
+		if GDrive != nil && GDrive.isReady {
+			driveStatus = "google_drive_active"
+		}
+
 		return c.JSON(fiber.Map{
-			"status":    "healthy",
-			"app":       "Neuraljira LiveChat",
-			"timestamp": time.Now().UnixMilli(),
+			"status":      "healthy",
+			"app":         "Neuraljira Live Platform",
+			"database":    dbStatus,
+			"storage":     driveStatus,
+			"timestamp":   time.Now().UnixMilli(),
 		})
 	})
 
-	// Información de sala
+	// Información de sala (para verificar si está en vivo y cuántos espectadores hay)
 	app.Get("/api/rooms/:room_id", func(c *fiber.Ctx) error {
 		roomID := c.Params("room_id")
 		hub.Mu.RLock()
@@ -63,20 +93,27 @@ func main() {
 
 		if !exists {
 			return c.JSON(fiber.Map{
-				"roomId":  roomID,
-				"active":  false,
-				"viewers": 0,
+				"roomId":     roomID,
+				"active":     false,
+				"isLive":     false,
+				"viewers":    0,
 			})
 		}
 
 		room.Mu.RLock()
 		viewers := len(room.Clients)
+		isLive := room.IsLive
+		streamMode := room.StreamMode
+		hostID := room.HostID
 		room.Mu.RUnlock()
 
 		return c.JSON(fiber.Map{
-			"roomId":  roomID,
-			"active":  true,
-			"viewers": viewers,
+			"roomId":     roomID,
+			"active":     true,
+			"isLive":     isLive,
+			"streamMode": streamMode,
+			"hostId":     hostID,
+			"viewers":    viewers,
 		})
 	})
 
@@ -89,30 +126,49 @@ func main() {
 		return fiber.ErrUpgradeRequired
 	})
 
-	// Endpoint WebSocket con soporte para salas
+	// Endpoint WebSocket con soporte para salas, autenticación JWT y WebRTC
 	app.Get("/ws/:room_id", websocket.New(func(conn *websocket.Conn) {
 		roomID := conn.Params("room_id")
 		if roomID == "" {
 			roomID = "main"
 		}
 
-		username := conn.Query("username")
-		if strings.TrimSpace(username) == "" {
-			username = fmt.Sprintf("NeuralUser_%s", uuid.New().String()[:4])
+		// Extraer datos del usuario autenticado si viene token JWT
+		tokenStr := conn.Query("token")
+		var userID string
+		var username string
+		var avatar string
+		var role string
+
+		if tokenStr != "" {
+			if claims, err := ValidateTokenString(tokenStr); err == nil {
+				userID = claims.UserID
+				username = claims.Username
+				avatar = claims.Avatar
+				role = claims.Role
+			}
 		}
 
-		avatar := conn.Query("avatar")
-		if avatar == "" {
-			avatar = "cyber-1"
-		}
-
-		role := conn.Query("role")
-		if role == "" {
-			role = "viewer"
+		// Fallback para invitados o si no hay token
+		if username == "" {
+			username = conn.Query("username")
+			if strings.TrimSpace(username) == "" {
+				username = fmt.Sprintf("NeuralUser_%s", uuid.New().String()[:4])
+			}
+			userID = fmt.Sprintf("guest_%s", uuid.New().String()[:8])
+			avatar = conn.Query("avatar")
+			if avatar == "" {
+				avatar = "cyber-1"
+			}
+			role = conn.Query("role")
+			if role == "" {
+				role = "viewer"
+			}
 		}
 
 		client := &Client{
 			ID:       uuid.New().String(),
+			UserID:   userID,
 			RoomID:   roomID,
 			Username: username,
 			Avatar:   avatar,
@@ -125,14 +181,11 @@ func main() {
 
 		hub.Register <- client
 
-		// Goroutine para escribir al cliente (writePump)
 		go writePump(client)
-
-		// Loop de lectura en la goroutine principal de la conexión (readPump)
 		readPump(client)
 	}))
 
-	log.Printf("🚀 Servidor Neuraljira LiveChat iniciado en puerto %s", port)
+	log.Printf("🚀 Servidor Neuraljira Live Platform iniciado en puerto %s", port)
 	if err := app.Listen(":" + port); err != nil {
 		log.Fatalf("Error iniciando servidor: %v", err)
 	}
@@ -163,20 +216,23 @@ func readPump(c *Client) {
 			Type     string `json:"type"`
 			Text     string `json:"text,omitempty"`
 			Reaction string `json:"reaction,omitempty"`
+			Payload  string `json:"payload,omitempty"` // Señales SDP / ICE de WebRTC
 		}
 
 		if err := json.Unmarshal(payload, &inMsg); err != nil {
 			continue
 		}
 
-		switch EventType(inMsg.Type) {
+		eventType := EventType(inMsg.Type)
+
+		switch eventType {
 		case EventChat:
 			trimmed := strings.TrimSpace(inMsg.Text)
 			if trimmed == "" || len(trimmed) > 500 {
 				continue
 			}
 
-			// Slow mode o protección básica de flood (mínimo 300ms entre mensajes)
+			// Protección de flood (300ms entre mensajes)
 			if time.Since(c.LastMsg) < 300*time.Millisecond {
 				continue
 			}
@@ -186,12 +242,14 @@ func readPump(c *Client) {
 				ID:        uuid.New().String(),
 				Type:      EventChat,
 				RoomID:    c.RoomID,
+				UserID:    c.UserID,
 				Sender:    c.Username,
 				Avatar:    c.Avatar,
 				Role:      c.Role,
 				Text:      trimmed,
 				CreatedAt: time.Now().UnixMilli(),
 			}
+			log.Printf("[WebSocket] 💬 Mensaje de '%s' en sala '%s': %s", c.Username, c.RoomID, trimmed)
 			c.Hub.Broadcast <- msg
 
 		case EventReaction:
@@ -202,12 +260,38 @@ func readPump(c *Client) {
 				ID:        uuid.New().String(),
 				Type:      EventReaction,
 				RoomID:    c.RoomID,
+				UserID:    c.UserID,
 				Sender:    c.Username,
 				Avatar:    c.Avatar,
 				Reaction:  inMsg.Reaction,
 				CreatedAt: time.Now().UnixMilli(),
 			}
 			c.Hub.Broadcast <- msg
+
+		// Iniciar directo (compartir pantalla o cámara)
+		case EventStreamStart:
+			streamMode := inMsg.Text
+			if streamMode == "" {
+				streamMode = "screen"
+			}
+			LiveManager.StartStream(c.RoomID, c.UserID, c.Username, streamMode)
+
+		// Detener directo
+		case EventStreamStop:
+			LiveManager.StopStream(c.RoomID)
+
+		// Señalización WebRTC (Offer, Answer, Candidate)
+		case EventWebRTCOffer, EventWebRTCAnswer, EventWebRTCCandidate:
+			signalMsg := Message{
+				ID:        uuid.New().String(),
+				Type:      eventType,
+				RoomID:    c.RoomID,
+				UserID:    c.UserID,
+				Sender:    c.Username,
+				Payload:   inMsg.Payload,
+				CreatedAt: time.Now().UnixMilli(),
+			}
+			LiveManager.HandleSignaling(c, signalMsg)
 		}
 	}
 }
@@ -224,25 +308,11 @@ func writePump(c *Client) {
 		case message, ok := <-c.Send:
 			c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
-				// El canal fue cerrado por el hub
 				c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
 
-			w, err := c.Conn.NextWriter(websocket.TextMessage)
-			if err != nil {
-				return
-			}
-			w.Write(message)
-
-			// Vía optimizada: enviar mensajes en cola si existen
-			n := len(c.Send)
-			for i := 0; i < n; i++ {
-				w.Write([]byte{'\n'})
-				w.Write(<-c.Send)
-			}
-
-			if err := w.Close(); err != nil {
+			if err := c.Conn.WriteMessage(websocket.TextMessage, message); err != nil {
 				return
 			}
 

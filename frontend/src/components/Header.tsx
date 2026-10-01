@@ -1,12 +1,20 @@
 import React, { useState } from 'react';
 import { Users, Radio, Share2, Check, LogOut, Wifi, WifiOff } from 'lucide-react';
 import { UserProfile } from '../types';
+import { HostStreamControls } from './HostStreamControls';
 
 interface HeaderProps {
   user: UserProfile;
   viewers: number;
   connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'reconnecting';
   onLeave: () => void;
+  // Propiedades de Live Streaming
+  isStreaming?: boolean;
+  onStartScreen?: () => void;
+  onStartCamera?: () => void;
+  onStopStream?: () => void;
+  isMuted?: boolean;
+  onToggleMic?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -14,6 +22,12 @@ export const Header: React.FC<HeaderProps> = ({
   viewers,
   connectionStatus,
   onLeave,
+  isStreaming = false,
+  onStartScreen,
+  onStartCamera,
+  onStopStream,
+  isMuted,
+  onToggleMic,
 }) => {
   const [copied, setCopied] = useState(false);
 
@@ -25,6 +39,8 @@ export const Header: React.FC<HeaderProps> = ({
       setTimeout(() => setCopied(false), 2000);
     }
   };
+
+  const canStream = user.role === 'host' || user.role === 'mod';
 
   return (
     <header className="h-16 px-4 bg-neural-900/90 backdrop-blur-md border-b border-neural-800 flex items-center justify-between shrink-0 select-none z-20">
@@ -50,15 +66,27 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
           <div className="flex items-center gap-1.5 text-xs text-slate-400">
             <Radio className="w-3 h-3 text-neural-cyan" />
-            <span className="font-mono text-slate-300 font-medium truncate max-w-[120px] sm:max-w-[180px]">
+            <span className="font-mono text-slate-300 font-medium truncate max-w-[100px] sm:max-w-[160px]">
               #{user.roomId}
             </span>
           </div>
         </div>
       </div>
 
-      {/* Viewers & Actions */}
-      <div className="flex items-center space-x-2 sm:space-x-3">
+      {/* Viewers, Host Controls & Actions */}
+      <div className="flex items-center space-x-2 sm:space-x-2.5">
+        {/* Botón de Transmisión para Host */}
+        {canStream && onStartScreen && onStartCamera && onStopStream && (
+          <HostStreamControls
+            isStreaming={isStreaming}
+            onStartScreen={onStartScreen}
+            onStartCamera={onStartCamera}
+            onStopStream={onStopStream}
+            isMuted={isMuted}
+            onToggleMic={onToggleMic}
+          />
+        )}
+
         {/* Contador de Espectadores */}
         <div className="flex items-center space-x-1.5 bg-neural-850 px-2.5 py-1.5 rounded-lg border border-neural-800 text-xs font-mono font-medium text-slate-200">
           <Users className="w-3.5 h-3.5 text-neural-cyan" />
@@ -91,11 +119,11 @@ export const Header: React.FC<HeaderProps> = ({
           {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4" />}
         </button>
 
-        {/* Salir / Cambiar sala */}
+        {/* Salir / Cambiar sesión */}
         <button
           onClick={onLeave}
           className="p-2 rounded-lg bg-neural-850 hover:bg-rose-950/40 border border-neural-800 hover:border-rose-800/40 text-slate-400 hover:text-rose-400 transition-colors"
-          title="Cambiar de sala"
+          title="Cerrar sesión / Salir"
         >
           <LogOut className="w-4 h-4" />
         </button>

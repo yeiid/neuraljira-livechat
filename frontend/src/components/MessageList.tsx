@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { ArrowDown, Crown, Shield, Star, MessageSquare } from 'lucide-react';
 import { ChatMessage, AVATARS, UserRole } from '../types';
+import { FileAttachmentView } from './FileAttachmentView';
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -158,6 +159,7 @@ export const MessageList: React.FC<MessageListProps> = ({ messages, currentUsern
                     }`}
                   >
                     {msg.text}
+                    {msg.attachment && <FileAttachmentView attachment={msg.attachment} />}
                   </div>
                 </div>
 
