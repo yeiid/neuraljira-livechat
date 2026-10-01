@@ -146,6 +146,8 @@ export function useLiveChat(user: UserProfile | null) {
               if (data.reaction) {
                 triggerFloatingReaction(data.reaction);
               }
+            } else if (data.type === 'story') {
+              window.dispatchEvent(new CustomEvent('neuraljira_story_update'));
             } else if (data.type === 'chat' || data.type === 'file' || data.type === 'user_join' || data.type === 'user_leave') {
               setMessages((prev) => {
                 // Evitar duplicados si ya existe el ID

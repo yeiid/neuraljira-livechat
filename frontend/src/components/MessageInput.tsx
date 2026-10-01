@@ -105,7 +105,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   }, [disabled]);
 
   return (
-    <div className="shrink-0 p-3 bg-neural-900 border-t border-neural-800 select-none">
+    <div className="shrink-0 p-2 sm:p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-neural-900 border-t border-neural-800 select-none">
       {/* Barra de progreso de subida a Google Drive */}
       {uploading && (
         <div className="mb-2 p-2 bg-neural-950 rounded-xl border border-neural-purple/40 animate-in fade-in">
@@ -126,8 +126,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       )}
 
       {/* Botonera de reacciones rápidas de directos */}
-      <div className="flex items-center justify-between pb-2.5 px-1 border-b border-neural-850/60 mb-2">
-        <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar py-0.5">
+      <div className="flex items-center justify-between pb-1.5 sm:pb-2.5 px-1 border-b border-neural-850/60 mb-1.5 sm:mb-2">
+        <div className="flex items-center space-x-1 sm:space-x-1.5 overflow-x-auto no-scrollbar py-0.5">
           {REACTIONS.map((r) => (
             <button
               key={r.type}

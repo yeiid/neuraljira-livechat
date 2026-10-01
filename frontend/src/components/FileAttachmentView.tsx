@@ -21,14 +21,14 @@ export const FileAttachmentView: React.FC<FileAttachmentViewProps> = ({ attachme
   const isZip = attachment.mimeType.includes('zip') || attachment.mimeType.includes('tar') || attachment.fileName.endsWith('.zip') || attachment.fileName.endsWith('.rar');
 
   return (
-    <div className="mt-2 rounded-xl overflow-hidden bg-neural-950 border border-neural-800 shadow-md max-w-sm">
+    <div className="mt-2 rounded-xl overflow-hidden bg-neural-950 border border-neural-800 shadow-md max-w-[260px] sm:max-w-sm">
       {/* Vista previa para Imágenes */}
       {isImage && (
-        <div className="relative max-h-48 overflow-hidden bg-neural-900 flex items-center justify-center">
+        <div className="relative max-h-36 sm:max-h-48 overflow-hidden bg-neural-900 flex items-center justify-center">
           <img
             src={attachment.viewLink}
             alt={attachment.fileName}
-            className="w-full h-auto object-cover max-h-48 hover:scale-105 transition-transform duration-300"
+            className="w-full h-auto object-cover max-h-36 sm:max-h-48 hover:scale-105 transition-transform duration-300"
             loading="lazy"
           />
         </div>
@@ -40,7 +40,7 @@ export const FileAttachmentView: React.FC<FileAttachmentViewProps> = ({ attachme
           <video
             src={attachment.viewLink}
             controls
-            className="w-full max-h-48 object-contain"
+            className="w-full max-h-36 sm:max-h-48 object-contain"
             preload="metadata"
           />
         </div>

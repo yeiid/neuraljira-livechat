@@ -8,6 +8,8 @@ import { ReactionOverlay } from './components/ReactionOverlay';
 import { AuthModal } from './components/AuthModal';
 import { LiveVideoPlayer } from './components/LiveVideoPlayer';
 import { SocialFeed } from './components/SocialFeed';
+import { StoryBar } from './components/StoryBar';
+import { useStories } from './hooks/useStories';
 import { Download } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -88,8 +90,16 @@ export const App: React.FC = () => {
     toggleMic,
   } = useLiveChat(user);
 
+  const {
+    groups: storyGroups,
+    createStory,
+    deleteStory,
+    viewStory,
+    reload: reloadStories,
+  } = useStories(user);
+
   return (
-    <div className="flex justify-center h-screen w-screen bg-neural-950 text-slate-100 overflow-hidden">
+    <div className="flex justify-center h-[100dvh] max-h-[100dvh] w-screen bg-neural-950 text-slate-100 overflow-hidden">
       {/* Contenedor adaptativo: en PC con live activo se expande a dos columnas */}
       <div
         className={`w-full h-full flex flex-col bg-neural-950 border-x border-neural-900 shadow-2xl relative transition-all duration-300 ${
@@ -142,8 +152,18 @@ export const App: React.FC = () => {
               onToggleMic={toggleMic}
             />
 
+            {/* Barra de Historias de la Comunidad (Stories 24h) */}
+            <StoryBar
+              groups={storyGroups}
+              user={user}
+              onCreate={createStory}
+              onDelete={deleteStory}
+              onView={viewStory}
+              onReload={reloadStories}
+            />
+
             {/* Tabs Live / Social */}
-            <div className="flex gap-1.5 px-3 pt-2 shrink-0">
+            <div className="flex gap-1.5 px-3 pt-1.5 shrink-0">
               <button
                 onClick={() => setActiveTab('live')}
                 className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'live' ? 'bg-gradient-to-r from-rose-600 to-purple-600 text-white' : 'bg-neural-900 text-slate-400 border border-neural-800'}`}

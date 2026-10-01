@@ -1,15 +1,12 @@
 import React, { useState } from 'react';
 import { UserProfile } from '../types';
 import { useSocialFeed } from '../hooks/useSocialFeed';
-import { useStories } from '../hooks/useStories';
 import { CreatePost } from './CreatePost';
 import { PostCard } from './PostCard';
-import { StoryBar } from './StoryBar';
 import { UserProfileModal } from './UserProfileModal';
 
 export const SocialFeed: React.FC<{ user: UserProfile | null }> = ({ user }) => {
   const { posts, loading, filter, setFilter, loadMore, reload, createPost, toggleLike, loadComments, addComment } = useSocialFeed(user);
-  const { groups, createStory, viewStory, reload: reloadStories } = useStories(user);
   const [profileId, setProfileId] = useState<string | null>(null);
 
   const handleDelete = async (id: string) => {
@@ -23,14 +20,6 @@ export const SocialFeed: React.FC<{ user: UserProfile | null }> = ({ user }) => 
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-3">
-      <StoryBar
-        groups={groups}
-        user={user}
-        onCreate={async (t) => { await createStory(t); reloadStories(); }}
-        onView={viewStory}
-        onReload={reloadStories}
-      />
-
       <CreatePost onPublish={createPost} user={user} />
 
       <div className="flex gap-1.5">
@@ -46,7 +35,7 @@ export const SocialFeed: React.FC<{ user: UserProfile | null }> = ({ user }) => 
         >
           👥 Seguidos
         </button>
-        <button onClick={() => { reload(); reloadStories(); }} className="ml-auto px-2.5 py-1.5 rounded-lg text-xs bg-neural-900 text-slate-400 border border-neural-800">
+        <button onClick={() => { reload(); window.dispatchEvent(new CustomEvent('neuraljira_story_update')); }} className="ml-auto px-2.5 py-1.5 rounded-lg text-xs bg-neural-900 text-slate-400 border border-neural-800">
           ↻
         </button>
       </div>
