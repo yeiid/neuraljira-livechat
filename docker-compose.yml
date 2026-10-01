@@ -11,7 +11,7 @@ services:
     restart: unless-stopped
     stop_grace_period: 10s
     ports:
-      - "${FRONTEND_PORT:-3000}:80"
+      - "${FRONTEND_PORT:-3050}:80"
     networks:
       - dokploy-network
     deploy:
@@ -39,7 +39,7 @@ services:
     labels:
       - "traefik.enable=true"
       # Dominio principal para la PWA en Dokploy
-      - "traefik.http.routers.neuraljira-fe.rule=Host(`${DOMAIN:-chat.neuraljira.com}`)"
+      - "traefik.http.routers.neuraljira-fe.rule=Host(`${DOMAIN:-chatjiralive.neuraljira.tech}`)"
       - "traefik.http.routers.neuraljira-fe.entrypoints=websecure"
       - "traefik.http.routers.neuraljira-fe.tls.certresolver=letsencrypt"
       - "traefik.http.routers.neuraljira-fe.priority=1"
@@ -55,7 +55,7 @@ services:
     restart: unless-stopped
     stop_grace_period: 15s
     ports:
-      - "${BACKEND_PORT:-4000}:4000"
+      - "${BACKEND_PORT:-4050}:4000"
       - "50000-50050:50000-50050/udp" # Rango de puertos UDP para WebRTC SFU
     environment:
       - PORT=4000
@@ -93,7 +93,7 @@ services:
     labels:
       - "traefik.enable=true"
       # Enrutar /ws (WebSockets) y /api (REST/Auth/Upload) al backend de Go en Dokploy
-      - "traefik.http.routers.neuraljira-be.rule=Host(`${DOMAIN:-chat.neuraljira.com}`) && (PathPrefix(`/ws`) || PathPrefix(`/api`))"
+      - "traefik.http.routers.neuraljira-be.rule=Host(`${DOMAIN:-chatjiralive.neuraljira.tech}`) && (PathPrefix(`/ws`) || PathPrefix(`/api`))"
       - "traefik.http.routers.neuraljira-be.entrypoints=websecure"
       - "traefik.http.routers.neuraljira-be.tls.certresolver=letsencrypt"
       - "traefik.http.routers.neuraljira-be.priority=10"
@@ -106,8 +106,7 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     command: postgres -c shared_buffers=128MB -c max_connections=100 -c work_mem=4MB -c effective_cache_size=256MB -c maintenance_work_mem=32MB
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+    # No se exponen puertos al host 0.0.0.0 para evitar colisiones y por seguridad
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-neuraluser}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neuralpass123}
@@ -143,8 +142,7 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     command: redis-server --appendonly yes --maxmemory 200mb --maxmemory-policy allkeys-lru
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
+    # No se exponen puertos al host para evitar colisiones con otros redis
     volumes:
       - redis_data:/data
     deploy:
@@ -175,4 +173,4 @@ volumes:
 
 networks:
   dokploy-network:
-    external: false
+    external: true
