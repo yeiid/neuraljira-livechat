@@ -39,7 +39,7 @@ En tu panel de **Dokploy**:
 1. Conecta este repositorio en un servicio tipo **Compose**.
 2. Configura las variables de entorno en la pestaña **Environment Variables**:
    ```env
-   DOMAIN=chat.neuraljira.com
+   DOMAIN=chatjiralive.neuraljira.tech
    PORT=4000
    
    # PostgreSQL
@@ -54,7 +54,7 @@ En tu panel de **Dokploy**:
    GOOGLE_DRIVE_FOLDER_ID=id_de_tu_carpeta_de_drive
    GOOGLE_SERVICE_ACCOUNT_KEY={"type":"service_account",...}
    ```
-3. En la pestaña **Domains**, asigna `chat.neuraljira.com` con SSL activado (Let's Encrypt).
+3. En la pestaña **Domains**, asigna `chatjiralive.neuraljira.tech` con SSL activado (Let's Encrypt).
 4. Haz clic en **Deploy**. Dokploy levantará los 4 servicios (Frontend PWA, Backend Go, PostgreSQL 16 y Redis) automáticamente.
 
 ---
