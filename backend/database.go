@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -48,6 +49,9 @@ func InitDatabase() {
 
 	// Sembrar Islas y Canales por defecto si no existen
 	SeedDefaultIslands()
+
+	// Sembrar contenido informativo sustancial en cada canal (estilo Telegram)
+	SeedChannelInformativeMessages()
 }
 
 // SaveMessageDB guarda un mensaje de chat en la base de datos de forma asíncrona
@@ -246,4 +250,168 @@ func SeedDefaultIslands() {
 			log.Printf("🏝️ [Database] Isla '%s' sembrada con %d canales", island.Name, len(island.Channels))
 		}
 	}
+}
+
+// SeedChannelInformativeMessages llena cada canal con información sustancial tipo Telegram
+func SeedChannelInformativeMessages() {
+	if DB == nil {
+		return
+	}
+
+	type SeedPost struct {
+		RoomID string
+		Sender string
+		Avatar string
+		Role   string
+		Text   string
+	}
+
+	seeds := []SeedPost{
+		// 1. #bienvenida
+		{
+			RoomID: "bienvenida",
+			Sender: "NeuralBot",
+			Avatar: "cyber-1",
+			Role:   "admin",
+			Text:   "📌 ¡BIENVENIDO A NEURALJIRA LIVE!\n\nEsta plataforma opera con grupos e islas temáticas con canales (#hashtags) al estilo Telegram.\n\nNormas comunitarias:\n• Respeta a todos los miembros.\n• No compartir malware destructivo.\n• Utiliza el canal adecuado según el tema.\n• Los moderadores están identificados con la insignia 🛡️ MOD.",
+		},
+		{
+			RoomID: "bienvenida",
+			Sender: "LeadMod",
+			Avatar: "cyber-2",
+			Role:   "mod",
+			Text:   "💡 GUÍA DE NAVEGACIÓN:\n\n💻 Isla Hacking:\n  • #carding: Seguridad en pagos y prevención antifraude\n  • #craking: Reversing y análisis binario\n  • #hack: Pentesting y exploits éticos\n  • #mod: Coordinación de staff\n\n🎓 Isla Cursos:\n  • #material: Recursos y lecturas\n  • #dudas: Soporte técnico\n  • #talleres: Transmisiones de laboratorio en vivo",
+		},
+
+		// 2. #general
+		{
+			RoomID: "general",
+			Sender: "NeuralBot",
+			Avatar: "cyber-1",
+			Role:   "admin",
+			Text:   "🌐 #GENERAL — Sala Central de la Comunidad\n\nEspacio abierto para networking, charlas técnicas informales, anuncios generales y coordinación comunitaria.",
+		},
+		{
+			RoomID: "general",
+			Sender: "LeadMod",
+			Avatar: "cyber-6",
+			Role:   "mod",
+			Text:   "🚀 Recuerda que puedes compartir archivos pesados directamente en el chat utilizando la integración con Google Drive (5TB). Pulsa el ícono de clip 📎 para adjuntar.",
+		},
+
+		// 3. #carding
+		{
+			RoomID: "carding",
+			Sender: "SecurityLead",
+			Avatar: "cyber-4",
+			Role:   "mod",
+			Text:   "🛡️ #CARDING — Investigación en Seguridad de Pasarelas y Prevención Antifraude\n\nEn este canal analizamos la arquitectura de pagos en línea bajo el marco PCI-DSS v4.0:\n\n1. Tokenización y Vaults: Por qué plataformas como Stripe/Adyen nunca guardan el PAN en claro.\n2. 3D Secure 2.2: Autenticación basada en riesgo (RBA) y biometría.\n3. Detección de Card-Testing: Patrones de bots usando BIN routing, velocity checks y machine learning.\n\n⚠️ Este canal es estrictamente educativo y orientado a la defensa de comercio electrónico.",
+		},
+		{
+			RoomID: "carding",
+			Sender: "LeadMod",
+			Avatar: "cyber-2",
+			Role:   "mod",
+			Text:   "📌 RECURSOS RECOMENDADOS:\n• Guía oficial PCI Security Standards Council (v4.0)\n• Arquitectura de verificación AVS (Address Verification Service) y CVV2\n• Implementación de Fingerprinting de dispositivos en checkout contra ataques automatizados.",
+		},
+
+		// 4. #craking
+		{
+			RoomID: "craking",
+			Sender: "ReverseEngineer",
+			Avatar: "cyber-3",
+			Role:   "mod",
+			Text:   "⚙️ #CRAKING — Laboratorio de Ingeniería Inversa y Análisis de Binarios\n\nHerramientas fundamentales de reversing:\n\n• Ghidra (NSA): Decompilador de código abierto para x86/x64/ARM/MIPS.\n• Radare2 / Cutter: Framework de línea de comandos para análisis estático y dinámico.\n• x64dbg / GDB con GEF: Debuggers para análisis en tiempo de ejecución.\n• IDA Pro / Binary Ninja: Herramientas profesionales de análisis de flujo de control.",
+		},
+		{
+			RoomID: "craking",
+			Sender: "ReverseEngineer",
+			Avatar: "cyber-5",
+			Role:   "mod",
+			Text:   "💡 TIP TÉCNICO: Al analizar binarios protegidos, verifica siempre los encabezados PE/ELF para identificar packers (UPX, VMProtect, Themida) con 'diec' (Detect It Easy). En próximos directos haremos análisis en vivo de binarios demostrativos.",
+		},
+
+		// 5. #hack
+		{
+			RoomID: "hack",
+			Sender: "RedTeamLeader",
+			Avatar: "cyber-6",
+			Role:   "mod",
+			Text:   "⚔️ #HACK — Pentesting, Metodología Ofensiva y Auditoría\n\nMetodología estándar para pruebas de intrusión web:\n\n1. Reconocimiento: Subfinder, Amass, Nmap, Naabu, httpx.\n2. Escaneo de Vulnerabilidades: Nuclei, Burp Suite Professional, OWASP ZAP.\n3. Explotación Ética: SQLi (sqlmap o payloads manuales blind), SSRF en metadatos cloud (169.254.169.254), IDOR y JWT secret cracking.\n4. Post-Explotación y Reporte: Guía OWASP ASVS y mitigaciones concretas.",
+		},
+		{
+			RoomID: "hack",
+			Sender: "NeuralBot",
+			Avatar: "cyber-1",
+			Role:   "admin",
+			Text:   "📌 PLATAFORMAS DE ENTRENAMIENTO:\n• Hack The Box (HTB) — Laboratorios de máquinas activas\n• PortSwigger Web Security Academy — Prácticas gratuitas de Burp Suite\n• TryHackMe (THM) — Salas guiadas para principiantes e intermedios.",
+		},
+
+		// 6. #mod
+		{
+			RoomID: "mod",
+			Sender: "NeuralBot",
+			Avatar: "cyber-1",
+			Role:   "admin",
+			Text:   "🛡️ #MOD — Canal Oficial de Moderadores y Staff\n\nProtocolo de acción rápida:\n1. Si detectas spam o ataques en cualquier canal, puedes eliminar el mensaje inmediatamente con el botón de papelera 🗑️.\n2. Los moderadores pueden publicar anuncios fijados usando el botón '➕ Añadir Info'.\n3. Coordina directos y eventos con los Super Admins.",
+		},
+
+		// 7. #material
+		{
+			RoomID: "material",
+			Sender: "EduMaster",
+			Avatar: "cyber-2",
+			Role:   "mod",
+			Text:   "📚 #MATERIAL — Biblioteca Digital y Recursos Didácticos\n\nCheatsheets esenciales de consulta rápida:\n• Cheatsheet de Nmap: `nmap -sC -sV -p- -T4 --min-rate 1000 -Pn <target>`\n• Cheatsheet de SQLi: Bypasses comunes de WAF (`UNION SELECT`, encodings UTF-8)\n• Cheatsheet de Linux Privilege Escalation: SUID binaries (`find / -perm -4000 2>/dev/null`), cronjobs y capabilities (`getcap -r / 2>/dev/null`).",
+		},
+		{
+			RoomID: "material",
+			Sender: "EduMaster",
+			Avatar: "cyber-5",
+			Role:   "mod",
+			Text:   "📁 Todos los archivos y diapositivas de las clases quedan almacenados de forma permanente en nuestro Google Drive de 5TB y pueden ser descargados directamente desde los mensajes del canal.",
+		},
+
+		// 8. #dudas
+		{
+			RoomID: "dudas",
+			Sender: "EduMaster",
+			Avatar: "cyber-3",
+			Role:   "mod",
+			Text:   "❓ #DUDAS — Preguntas y Respuestas Técnicas\n\nPara obtener la mejor ayuda de la comunidad, formula tus preguntas incluyendo:\n1. Qué herramienta o tecnología estás utilizando.\n2. Cuál es el error exacto (copia el log o sube una captura con 📎).\n3. Qué pasos ya intentaste para resolverlo.",
+		},
+
+		// 9. #talleres
+		{
+			RoomID: "talleres",
+			Sender: "LeadMod",
+			Avatar: "cyber-6",
+			Role:   "host",
+			Text:   "🎥 #TALLERES — Laboratorios Prácticos en Vivo\n\nEn este canal realizamos streaming de pantalla en ultra baja latencia con WebRTC. Cuando comience un directo, verás el reproductor automáticamente en la parte superior.\n\nPróximas temáticas de taller:\n• Análisis de malware en entornos sandbox (AnyRun / Cuckoo)\n• Configuración de proxys inversos seguros con TLS 1.3\n• Desarrollo de extensiones y herramientas en Go y Python.",
+		},
+	}
+
+	baseTime := time.Now().Add(-2 * time.Hour).UnixMilli()
+
+	for i, s := range seeds {
+		var count int64
+		DB.Model(&Message{}).Where("room_id = ? AND text = ?", s.RoomID, s.Text).Count(&count)
+		if count == 0 {
+			msg := Message{
+				ID:        uuid.New().String(),
+				Type:      EventChat,
+				RoomID:    s.RoomID,
+				UserID:    "system_" + s.Sender,
+				Sender:    s.Sender,
+				Avatar:    s.Avatar,
+				Role:      s.Role,
+				Text:      s.Text,
+				CreatedAt: baseTime + int64(i*120000),
+			}
+			if err := DB.Create(&msg).Error; err != nil {
+				log.Printf("[Database] Error sembrando mensaje informativo en %s: %v", s.RoomID, err)
+			}
+		}
+	}
+	log.Println("📚 [Database] Mensajes informativos de canales sembrados correctamente.")
 }

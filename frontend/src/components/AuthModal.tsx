@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, Lock, User, ShieldCheck, Zap, ArrowRight, UserPlus, LogIn } from 'lucide-react';
+import { Lock, User, ShieldCheck, Zap, ArrowRight, UserPlus, LogIn } from 'lucide-react';
 import { UserProfile, AVATARS, UserRole } from '../types';
 
 interface AuthModalProps {
@@ -14,7 +14,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onContinueAsGuest,
 }) => {
   const [tab, setTab] = useState<'login' | 'register'>('login');
-  const [roomId, setRoomId] = useState(initialRoomId || 'general');
+  const roomId = initialRoomId || 'general';
 
   // Formulario Login
   const [loginIdentifier, setLoginIdentifier] = useState('');
@@ -140,24 +140,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <p className="text-xs text-slate-400 mt-0.5">
             Streaming de Ultra Baja Latencia & Chat en Vivo
           </p>
-        </div>
-
-        {/* Selector de Sala */}
-        <div className="mb-4 relative z-10">
-          <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1 flex items-center gap-1.5">
-            <Sparkles className="w-3 h-3 text-neural-cyan" />
-            Sala de Directo
-          </label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-mono text-xs">#</span>
-            <input
-              type="text"
-              value={roomId}
-              onChange={(e) => setRoomId(e.target.value)}
-              placeholder="general, lanzamientos, live-ia"
-              className="w-full pl-7 pr-3 py-2 bg-neural-950 border border-neural-800 focus:border-neural-cyan rounded-xl text-white font-mono text-xs placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-neural-cyan transition-all"
-            />
-          </div>
         </div>
 
         {/* Pestañas de Login / Registro */}

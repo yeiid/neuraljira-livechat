@@ -18,6 +18,11 @@ import {
   Layers,
   ChevronRight,
   Lock,
+  Plus,
+  Edit3,
+  X,
+  Check,
+  Pin,
 } from 'lucide-react';
 
 interface IslandsBarProps {
@@ -69,6 +74,13 @@ export const IslandsBar: React.FC<IslandsBarProps> = ({
   const [selectedIslandId, setSelectedIslandId] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
+  // Estados para moderador agregando información / anuncios al canal (estilo Telegram)
+  const [showModInfoModal, setShowModInfoModal] = useState(false);
+  const [modTab, setModTab] = useState<'announcement' | 'topic'>('announcement');
+  const [modInputText, setModInputText] = useState('');
+  const [isSubmittingMod, setIsSubmittingMod] = useState(false);
+  const [modStatusMsg, setModStatusMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
   const fetchIslands = async () => {
     try {
       const res = await fetch('/api/islands');
@@ -113,7 +125,65 @@ export const IslandsBar: React.FC<IslandsBarProps> = ({
   }, [currentRoomId, islands]);
 
   const activeIsland = islands.find((isl) => isl.id === selectedIslandId) || islands[0];
+  const currentChannel = activeIsland?.channels?.find((ch) => ch.slug === currentRoomId);
   const isAdmin = user?.role === 'admin';
+  const isModOrAdmin = user?.role === 'admin' || user?.role === 'mod';
+
+  const handleModSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!modInputText.trim() || !user?.token || !currentRoomId) return;
+    setIsSubmittingMod(true);
+    setModStatusMsg(null);
+
+    try {
+      if (modTab === 'announcement') {
+        const res = await fetch(`/api/channels/${encodeURIComponent(currentRoomId)}/announcement`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${user.token}`,
+          },
+          body: JSON.stringify({ text: modInputText.trim() }),
+        });
+        if (res.ok) {
+          setModStatusMsg({ ok: true, text: '¡Información publicada en el chat!' });
+          setTimeout(() => {
+            setShowModInfoModal(false);
+            setModInputText('');
+            setModStatusMsg(null);
+          }, 1000);
+        } else {
+          const err = await res.json();
+          setModStatusMsg({ ok: false, text: err.error || 'Error al publicar' });
+        }
+      } else {
+        const res = await fetch(`/api/channels/${encodeURIComponent(currentRoomId)}/topic`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${user.token}`,
+          },
+          body: JSON.stringify({ description: modInputText.trim() }),
+        });
+        if (res.ok) {
+          setModStatusMsg({ ok: true, text: '¡Tema del canal actualizado!' });
+          fetchIslands();
+          setTimeout(() => {
+            setShowModInfoModal(false);
+            setModInputText('');
+            setModStatusMsg(null);
+          }, 1000);
+        } else {
+          const err = await res.json();
+          setModStatusMsg({ ok: false, text: err.error || 'Error al actualizar tema' });
+        }
+      }
+    } catch (e) {
+      setModStatusMsg({ ok: false, text: 'Error de conexión con el servidor' });
+    } finally {
+      setIsSubmittingMod(false);
+    }
+  };
 
   if (loading && islands.length === 0) {
     return (
@@ -227,6 +297,148 @@ export const IslandsBar: React.FC<IslandsBarProps> = ({
                 </button>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* 3. Tópico e Información del Canal (Estilo Telegram Grupos/Temas) */}
+      {currentChannel && (
+        <div className="flex items-center justify-between gap-2 px-2.5 py-1 bg-neural-900/40 rounded-lg border border-neural-850/80 text-xs">
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            <span className="text-amber-400 font-bold flex items-center gap-1 shrink-0 text-[11px]">
+              📌
+            </span>
+            <div className="truncate text-[11px] text-slate-300">
+              <span className="font-semibold text-neural-cyan font-mono mr-1.5">
+                #{currentChannel.name}
+              </span>
+              <span className="text-slate-400">
+                {currentChannel.description || 'Tema oficial de discusión e intercambio técnico.'}
+              </span>
+            </div>
+          </div>
+
+          {isModOrAdmin && (
+            <button
+              onClick={() => {
+                setShowModInfoModal(true);
+                setModInputText(modTab === 'topic' ? currentChannel.description || '' : '');
+              }}
+              className="px-2 py-0.5 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold flex items-center gap-1 shrink-0 transition-colors shadow-sm"
+              title="Agregar información o fijar anuncio como moderador"
+            >
+              <Plus className="w-3 h-3" />
+              <span>Añadir Info</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Modal para que el Moderador publique información o edite el tema */}
+      {showModInfoModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 animate-fade-in">
+          <div className="bg-neural-900 border border-neural-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col">
+            <div className="px-4 py-3 border-b border-neural-800 flex items-center justify-between bg-neural-950/60">
+              <div className="flex items-center gap-2">
+                <Pin className="w-4 h-4 text-neural-cyan" />
+                <h3 className="text-xs font-bold text-white">
+                  Moderación: #{currentChannel?.name}
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowModInfoModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex border-b border-neural-800 px-4 bg-neural-950/30">
+              <button
+                type="button"
+                onClick={() => {
+                  setModTab('announcement');
+                  setModInputText('');
+                }}
+                className={`py-2 px-3 text-xs font-bold border-b-2 transition-all ${
+                  modTab === 'announcement'
+                    ? 'border-neural-cyan text-neural-cyan'
+                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Publicar Info / Anuncio
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setModTab('topic');
+                  setModInputText(currentChannel?.description || '');
+                }}
+                className={`py-2 px-3 text-xs font-bold border-b-2 transition-all ${
+                  modTab === 'topic'
+                    ? 'border-neural-cyan text-neural-cyan'
+                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Editar Descripción del Tema
+              </button>
+            </div>
+
+            <form onSubmit={handleModSubmit} className="p-4 space-y-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                  {modTab === 'announcement'
+                    ? 'Información o notas técnicas que se publicarán en el chat:'
+                    : 'Descripción o reglas del canal (Tema):'}
+                </label>
+                <textarea
+                  value={modInputText}
+                  onChange={(e) => setModInputText(e.target.value)}
+                  placeholder={
+                    modTab === 'announcement'
+                      ? 'Escribe recursos, enlaces, comandos o avisos oficiales...'
+                      : 'Breve descripción o temática de este canal...'
+                  }
+                  rows={4}
+                  required
+                  className="w-full bg-neural-950 border border-neural-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-neural-cyan"
+                />
+              </div>
+
+              {modStatusMsg && (
+                <div
+                  className={`p-2.5 rounded-xl text-xs flex items-center gap-2 ${
+                    modStatusMsg.ok
+                      ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300'
+                      : 'bg-rose-500/10 border border-rose-500/30 text-rose-300'
+                  }`}
+                >
+                  {modStatusMsg.ok ? (
+                    <Check className="w-3.5 h-3.5 shrink-0" />
+                  ) : (
+                    <Edit3 className="w-3.5 h-3.5 shrink-0" />
+                  )}
+                  <span>{modStatusMsg.text}</span>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowModInfoModal(false)}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-neural-800"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingMod}
+                  className="px-4 py-1.5 bg-gradient-to-r from-neural-purple to-neural-cyan text-white text-xs font-bold rounded-xl shadow-md disabled:opacity-50"
+                >
+                  {isSubmittingMod ? 'Guardando...' : 'Guardar y Publicar'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

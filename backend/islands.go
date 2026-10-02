@@ -208,4 +208,79 @@ func SetupIslandRoutes(app *fiber.App, hub *Hub) {
 
 		return c.JSON(fiber.Map{"success": true, "message": "Canal eliminado correctamente"})
 	})
+
+	// PUT /api/channels/:slug/topic - Actualizar descripción / tema del canal (Moderadores y Admins)
+	app.Put("/api/channels/:slug/topic", JWTMiddleware(), AdminOrModMiddleware(), func(c *fiber.Ctx) error {
+		if DB == nil {
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "Base de datos no disponible"})
+		}
+
+		slug := c.Params("slug")
+		var req struct {
+			Description string `json:"description"`
+		}
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Cuerpo inválido"})
+		}
+
+		var channel Channel
+		if err := DB.First(&channel, "slug = ?", slug).Error; err != nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Canal no encontrado"})
+		}
+
+		channel.Description = strings.TrimSpace(req.Description)
+		channel.UpdatedAt = time.Now()
+		if err := DB.Save(&channel).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Error al actualizar tema del canal"})
+		}
+
+		return c.JSON(fiber.Map{
+			"success":     true,
+			"slug":        channel.Slug,
+			"description": channel.Description,
+		})
+	})
+
+	// POST /api/channels/:slug/announcement - Publicar información oficial / anuncio en el canal (Moderadores y Admins)
+	app.Post("/api/channels/:slug/announcement", JWTMiddleware(), AdminOrModMiddleware(), func(c *fiber.Ctx) error {
+		if DB == nil {
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "Base de datos no disponible"})
+		}
+
+		claims := c.Locals("user").(*UserClaims)
+		slug := c.Params("slug")
+
+		var req struct {
+			Text string `json:"text"`
+		}
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Cuerpo inválido"})
+		}
+
+		text := strings.TrimSpace(req.Text)
+		if text == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "El contenido no puede estar vacío"})
+		}
+
+		msg := Message{
+			ID:        uuid.New().String(),
+			Type:      EventChat,
+			RoomID:    slug,
+			UserID:    claims.UserID,
+			Sender:    claims.Username,
+			Avatar:    claims.Avatar,
+			Role:      claims.Role,
+			Text:      "📌 [INFO OFICIAL / TÓPICO]:\n" + text,
+			CreatedAt: time.Now().UnixMilli(),
+		}
+
+		if err := DB.Create(&msg).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Error guardando anuncio"})
+		}
+
+		// Enviar por WebSocket a todos en tiempo real
+		hub.BroadcastToRoom(slug, msg, true)
+
+		return c.Status(fiber.StatusCreated).JSON(msg)
+	})
 }
