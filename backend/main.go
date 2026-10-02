@@ -64,6 +64,12 @@ func main() {
 	// 6. Registrar Red Social (feed + follows + stories)
 	SetupSocialRoutes(app, hub)
 
+	// 7. Registrar Rutas de Islas y Canales Temáticos
+	SetupIslandRoutes(app, hub)
+
+	// 8. Registrar Rutas de Moderación y Super Admin
+	SetupModerationRoutes(app, hub)
+
 	// Health check para Dokploy / Traefik
 	app.Get("/api/health", func(c *fiber.Ctx) error {
 		dbStatus := "connected"

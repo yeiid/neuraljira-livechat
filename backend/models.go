@@ -31,6 +31,8 @@ const (
 	EventPost           EventType = "post_new"
 	EventPostLike       EventType = "post_like"
 	EventStory          EventType = "story_new"
+	// Moderación
+	EventMessageDelete  EventType = "message_delete"
 )
 
 // User representa al usuario registrado en la base de datos
@@ -40,10 +42,35 @@ type User struct {
 	Email        string         `gorm:"uniqueIndex;type:varchar(128);not null" json:"email"`
 	PasswordHash string         `gorm:"type:varchar(255);not null" json:"-"`
 	Avatar       string         `gorm:"type:varchar(64);default:'cyber-1'" json:"avatar"`
-	Role         string         `gorm:"type:varchar(20);default:'viewer'" json:"role"` // host, mod, vip, viewer
+	Role         string         `gorm:"type:varchar(20);default:'viewer'" json:"role"` // admin, host, mod, vip, viewer
 	CreatedAt    time.Time      `json:"createdAt"`
 	UpdatedAt    time.Time      `json:"updatedAt"`
 	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+// Island representa una categoría temática o isla de chats (ej: Hacking, Cursos, General)
+type Island struct {
+	ID          string    `gorm:"primaryKey;type:varchar(64)" json:"id"`
+	Name        string    `gorm:"type:varchar(64);not null" json:"name"`
+	Icon        string    `gorm:"type:varchar(32);default:'Terminal'" json:"icon"`
+	Description string    `gorm:"type:text" json:"description"`
+	Order       int       `gorm:"default:0" json:"order"`
+	Channels    []Channel `gorm:"foreignKey:IslandID;constraint:OnDelete:CASCADE" json:"channels"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
+// Channel representa un canal o sala de chat específica dentro de una isla (ej: #carding, #craking, #hack, #mod)
+type Channel struct {
+	ID          string    `gorm:"primaryKey;type:varchar(64)" json:"id"`
+	IslandID    string    `gorm:"type:varchar(64);index;not null" json:"islandId"`
+	Name        string    `gorm:"type:varchar(64);not null" json:"name"`
+	Slug        string    `gorm:"type:varchar(64);index;not null" json:"slug"`
+	Description string    `gorm:"type:text" json:"description"`
+	Icon        string    `gorm:"type:varchar(32);default:'Hash'" json:"icon"`
+	MinRole     string    `gorm:"type:varchar(20);default:'viewer'" json:"minRole"` // viewer, mod, admin
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 // Room representa una sala de directo persistida

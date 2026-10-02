@@ -9,6 +9,8 @@ import { AuthModal } from './components/AuthModal';
 import { LiveVideoPlayer } from './components/LiveVideoPlayer';
 import { SocialFeed } from './components/SocialFeed';
 import { StoryBar } from './components/StoryBar';
+import { IslandsBar } from './components/IslandsBar';
+import { AdminModerationModal } from './components/AdminModerationModal';
 import { useStories } from './hooks/useStories';
 import { Download } from 'lucide-react';
 
@@ -71,6 +73,17 @@ export const App: React.FC = () => {
     localStorage.removeItem('neuraljira_live_user');
   };
 
+  const [showAdminModal, setShowAdminModal] = useState(false);
+
+  const handleSelectChannel = (slug: string) => {
+    if (!user) return;
+    const updatedUser: UserProfile = { ...user, roomId: slug };
+    setUser(updatedUser);
+    localStorage.setItem('neuraljira_live_user', JSON.stringify(updatedUser));
+    const newUrl = `${window.location.pathname}?room=${encodeURIComponent(slug)}`;
+    window.history.replaceState(null, '', newUrl);
+  };
+
   const {
     messages,
     viewers,
@@ -78,6 +91,7 @@ export const App: React.FC = () => {
     connectionStatus,
     sendMessage,
     sendReaction,
+    deleteMessage,
     // Live Streaming
     isLive,
     streamMode,
@@ -144,6 +158,7 @@ export const App: React.FC = () => {
               viewers={viewers}
               connectionStatus={connectionStatus}
               onLeave={handleLeave}
+              onOpenAdminModal={() => setShowAdminModal(true)}
               isStreaming={isStreaming}
               onStartScreen={startScreenStream}
               onStartCamera={startCameraStream}
@@ -178,6 +193,16 @@ export const App: React.FC = () => {
               </button>
             </div>
 
+            {/* Barra de Islas (Categorías y Canales de Chat diagramadas por el usuario) */}
+            {activeTab === 'live' && (
+              <IslandsBar
+                currentRoomId={user.roomId}
+                onSelectChannel={handleSelectChannel}
+                user={user}
+                onOpenAdminModal={() => setShowAdminModal(true)}
+              />
+            )}
+
             {/* Layout adaptable para Video + Chat */}
             {activeTab === 'live' ? (
             <div
@@ -200,7 +225,12 @@ export const App: React.FC = () => {
               {/* Sección de Chat */}
               <div className="relative flex-1 flex flex-col min-h-0 overflow-hidden">
                 <ReactionOverlay reactions={floatingReactions} />
-                <MessageList messages={messages} currentUsername={user.username} />
+                <MessageList
+                  messages={messages}
+                  currentUsername={user.username}
+                  currentUserRole={user.role}
+                  onDeleteMessage={deleteMessage}
+                />
 
                 <MessageInput
                   onSendMessage={sendMessage}
@@ -214,6 +244,17 @@ export const App: React.FC = () => {
             ) : (
               <SocialFeed user={user} />
             )}
+
+            {/* Modal de Super Admin y Moderación */}
+            <AdminModerationModal
+              isOpen={showAdminModal}
+              onClose={() => setShowAdminModal(false)}
+              user={user}
+              onUserUpdated={(updated) => {
+                setUser(updated);
+                localStorage.setItem('neuraljira_live_user', JSON.stringify(updated));
+              }}
+            />
           </>
         )}
       </div>

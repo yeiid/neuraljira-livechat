@@ -1,14 +1,21 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { ArrowDown, Crown, Shield, Star, MessageSquare } from 'lucide-react';
+import { ArrowDown, Crown, Shield, Star, MessageSquare, Trash2 } from 'lucide-react';
 import { ChatMessage, AVATARS, UserRole } from '../types';
 import { FileAttachmentView } from './FileAttachmentView';
 
 interface MessageListProps {
   messages: ChatMessage[];
   currentUsername: string;
+  currentUserRole?: UserRole;
+  onDeleteMessage?: (messageId: string) => void;
 }
 
-export const MessageList: React.FC<MessageListProps> = ({ messages, currentUsername }) => {
+export const MessageList: React.FC<MessageListProps> = ({
+  messages,
+  currentUsername,
+  currentUserRole,
+  onDeleteMessage,
+}) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const [showScrollBottomBtn, setShowScrollBottomBtn] = useState(false);
@@ -47,6 +54,14 @@ export const MessageList: React.FC<MessageListProps> = ({ messages, currentUsern
   const renderRoleBadge = (role?: UserRole) => {
     if (!role || role === 'viewer') return null;
 
+    if (role === 'admin') {
+      return (
+        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+          <Shield className="w-2.5 h-2.5 text-amber-400" />
+          ADMIN
+        </span>
+      );
+    }
     if (role === 'host') {
       return (
         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-gradient-to-r from-amber-500/20 to-rose-500/20 text-amber-300 border border-amber-500/30">
@@ -150,16 +165,38 @@ export const MessageList: React.FC<MessageListProps> = ({ messages, currentUsern
                     <span className="text-[10px] text-slate-500 font-mono">{timeStr}</span>
                   </div>
 
-                  {/* Burbuja del mensaje */}
-                  <div
-                    className={`px-3.5 py-2 rounded-2xl break-words text-[13px] leading-relaxed select-text shadow-sm ${
-                      isMe
-                        ? 'bg-gradient-to-r from-neural-purple to-purple-600 text-white rounded-tr-none'
-                        : 'bg-neural-900 border border-neural-800 text-slate-200 rounded-tl-none'
-                    }`}
-                  >
-                    {msg.text}
-                    {msg.attachment && <FileAttachmentView attachment={msg.attachment} />}
+                  {/* Burbuja del mensaje y acción de moderación */}
+                  <div className="flex items-center gap-1 group/bubble">
+                    {isMe && (currentUserRole === 'admin' || currentUserRole === 'mod') && onDeleteMessage && (
+                      <button
+                        onClick={() => onDeleteMessage(msg.id)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-slate-500 hover:text-rose-400 rounded hover:bg-neural-900"
+                        title="Eliminar mensaje (Moderación)"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+
+                    <div
+                      className={`px-3.5 py-2 rounded-2xl break-words text-[13px] leading-relaxed select-text shadow-sm ${
+                        isMe
+                          ? 'bg-gradient-to-r from-neural-purple to-purple-600 text-white rounded-tr-none'
+                          : 'bg-neural-900 border border-neural-800 text-slate-200 rounded-tl-none'
+                      }`}
+                    >
+                      {msg.text}
+                      {msg.attachment && <FileAttachmentView attachment={msg.attachment} />}
+                    </div>
+
+                    {!isMe && (currentUserRole === 'admin' || currentUserRole === 'mod') && onDeleteMessage && (
+                      <button
+                        onClick={() => onDeleteMessage(msg.id)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-slate-500 hover:text-rose-400 rounded hover:bg-neural-900"
+                        title="Eliminar mensaje (Moderación)"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
 

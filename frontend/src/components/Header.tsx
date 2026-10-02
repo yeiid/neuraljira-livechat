@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Radio, Share2, Check, LogOut, Wifi, WifiOff } from 'lucide-react';
+import { Users, Radio, Share2, Check, LogOut, Wifi, WifiOff, Shield } from 'lucide-react';
 import { UserProfile } from '../types';
 import { HostStreamControls } from './HostStreamControls';
 
@@ -8,6 +8,7 @@ interface HeaderProps {
   viewers: number;
   connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'reconnecting';
   onLeave: () => void;
+  onOpenAdminModal?: () => void;
   // Propiedades de Live Streaming
   isStreaming?: boolean;
   onStartScreen?: () => void;
@@ -22,6 +23,7 @@ export const Header: React.FC<HeaderProps> = ({
   viewers,
   connectionStatus,
   onLeave,
+  onOpenAdminModal,
   isStreaming = false,
   onStartScreen,
   onStartCamera,
@@ -40,7 +42,7 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  const canStream = user.role === 'host' || user.role === 'mod';
+  const canStream = user.role === 'host' || user.role === 'mod' || user.role === 'admin';
 
   return (
     <header className="h-16 px-4 bg-neural-900/90 backdrop-blur-md border-b border-neural-800 flex items-center justify-between shrink-0 select-none z-20">
@@ -109,6 +111,21 @@ export const Header: React.FC<HeaderProps> = ({
             <WifiOff className="w-3.5 h-3.5 text-rose-400" />
           )}
         </div>
+
+        {/* Botón de Administración / Clave Maestra */}
+        {onOpenAdminModal && (
+          <button
+            onClick={onOpenAdminModal}
+            className={`p-2 rounded-lg border transition-colors ${
+              user.role === 'admin'
+                ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 hover:bg-amber-500/30'
+                : 'bg-neural-850 hover:bg-neural-800 border-neural-800 text-slate-300 hover:text-white'
+            }`}
+            title={user.role === 'admin' ? 'Panel de Super Admin' : 'Reclamar Super Admin'}
+          >
+            <Shield className="w-4 h-4" />
+          </button>
+        )}
 
         {/* Compartir enlace */}
         <button

@@ -12,9 +12,31 @@ export type EventType =
   | 'webrtc_candidate'
   | 'stream_start'
   | 'stream_stop'
-  | 'stream_status';
+  | 'stream_status'
+  | 'message_delete';
 
-export type UserRole = 'host' | 'mod' | 'vip' | 'viewer';
+export type UserRole = 'admin' | 'host' | 'mod' | 'vip' | 'viewer';
+
+export interface Channel {
+  id: string;
+  islandId: string;
+  name: string;
+  slug: string;
+  description: string;
+  icon?: string;
+  minRole?: UserRole;
+  liveViewers?: number;
+  isLive?: boolean;
+}
+
+export interface Island {
+  id: string;
+  name: string;
+  icon?: string;
+  description?: string;
+  order: number;
+  channels: Channel[];
+}
 
 export interface User {
   id: string;

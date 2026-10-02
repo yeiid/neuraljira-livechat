@@ -26,6 +26,17 @@ export function useLiveChat(user: UserProfile | null) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttempts = useRef<number>(0);
+  const lastRoomRef = useRef<string>(user?.roomId || '');
+
+  // Limpiar mensajes y estados al cambiar de sala
+  useEffect(() => {
+    if (user?.roomId && user.roomId !== lastRoomRef.current) {
+      lastRoomRef.current = user.roomId;
+      setMessages([]);
+      setIsLive(false);
+      setLiveStream(null);
+    }
+  }, [user?.roomId]);
 
   // Referencias para WebRTC
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -148,6 +159,11 @@ export function useLiveChat(user: UserProfile | null) {
               }
             } else if (data.type === 'story') {
               window.dispatchEvent(new CustomEvent('neuraljira_story_update'));
+            } else if (data.type === 'message_delete') {
+              const deletedId = data.text;
+              if (deletedId) {
+                setMessages((prev) => prev.filter((m) => m.id !== deletedId));
+              }
             } else if (data.type === 'chat' || data.type === 'file' || data.type === 'user_join' || data.type === 'user_leave') {
               setMessages((prev) => {
                 // Evitar duplicados si ya existe el ID
@@ -408,6 +424,21 @@ export function useLiveChat(user: UserProfile | null) {
     [triggerFloatingReaction]
   );
 
+  // Eliminar mensaje como Moderador o Super Admin
+  const deleteMessage = useCallback(async (messageId: string): Promise<boolean> => {
+    if (!user?.token) return false;
+    try {
+      const res = await fetch(`/api/moderation/messages/${messageId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      return res.ok;
+    } catch (e) {
+      console.error('[Error al eliminar mensaje]', e);
+      return false;
+    }
+  }, [user?.token]);
+
   return {
     messages,
     viewers,
@@ -415,6 +446,7 @@ export function useLiveChat(user: UserProfile | null) {
     connectionStatus,
     sendMessage,
     sendReaction,
+    deleteMessage,
     // Live Streaming
     isLive,
     streamMode,

@@ -1,11 +1,10 @@
-# syntax=docker/dockerfile:1
 # Etapa 1: Compilación
 FROM node:22-alpine AS builder
 
 WORKDIR /app
 
 COPY package*.json ./
-RUN --mount=type=cache,target=/root/.npm npm ci
+RUN npm ci
 
 COPY . .
 
@@ -13,7 +12,7 @@ COPY . .
 ARG VITE_WS_URL
 ENV VITE_WS_URL=$VITE_WS_URL
 
-RUN --mount=type=cache,target=/root/.npm npm run build
+RUN npm run build
 
 # Etapa 2: Servidor Web Nginx ultra ligero
 FROM nginx:alpine
