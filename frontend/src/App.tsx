@@ -11,6 +11,7 @@ import { SocialFeed } from './components/SocialFeed';
 import { StoryBar } from './components/StoryBar';
 import { IslandsBar } from './components/IslandsBar';
 import { AdminModerationModal } from './components/AdminModerationModal';
+import { FloatingChatBubble } from './components/FloatingChatBubble';
 import { useStories } from './hooks/useStories';
 import { Download } from 'lucide-react';
 
@@ -31,6 +32,7 @@ export const App: React.FC = () => {
   // Prompt de instalación PWA
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [isBubblePinned, setIsBubblePinned] = useState(false);
 
   useEffect(() => {
     const handler = (e: any) => {
@@ -165,6 +167,10 @@ export const App: React.FC = () => {
               onStopStream={stopStream}
               isMuted={isMicMuted}
               onToggleMic={toggleMic}
+              isBubbleOpen={activeTab === 'social' || isBubblePinned}
+              onToggleBubble={() => setIsBubblePinned((prev) => !prev)}
+              canInstallPwa={Boolean(installPrompt)}
+              onInstallPwa={handleInstallClick}
             />
 
             {/* Barra de Historias de la Comunidad (Stories 24h) */}
@@ -255,6 +261,20 @@ export const App: React.FC = () => {
                 localStorage.setItem('neuraljira_live_user', JSON.stringify(updated));
               }}
             />
+
+            {/* Burbuja flotante de chat en tiempo real */}
+            {(activeTab === 'social' || isBubblePinned) && (
+              <FloatingChatBubble
+                currentRoomId={user.roomId}
+                messages={messages}
+                user={user}
+                onSendMessage={sendMessage}
+                onOpenFullChat={() => {
+                  setActiveTab('live');
+                  setIsBubblePinned(false);
+                }}
+              />
+            )}
           </>
         )}
       </div>

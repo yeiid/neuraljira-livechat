@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'icons/*.png'],
+      includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png'],
       manifest: {
         name: 'Neuraljira LiveChat',
         short_name: 'NeuralLive',
@@ -16,6 +16,8 @@ export default defineConfig({
         background_color: '#06060a',
         display: 'standalone',
         orientation: 'portrait-primary',
+        start_url: '/',
+        scope: '/',
         icons: [
           {
             src: '/pwa-192x192.png',

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Radio, Share2, Check, LogOut, Wifi, WifiOff, Shield } from 'lucide-react';
+import { Users, Radio, Share2, Check, LogOut, Wifi, WifiOff, Shield, MessageCircle, Download } from 'lucide-react';
 import { UserProfile } from '../types';
 import { HostStreamControls } from './HostStreamControls';
 
@@ -16,6 +16,11 @@ interface HeaderProps {
   onStopStream?: () => void;
   isMuted?: boolean;
   onToggleMic?: () => void;
+  // Burbuja flotante y PWA
+  isBubbleOpen?: boolean;
+  onToggleBubble?: () => void;
+  canInstallPwa?: boolean;
+  onInstallPwa?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -30,6 +35,10 @@ export const Header: React.FC<HeaderProps> = ({
   onStopStream,
   isMuted,
   onToggleMic,
+  isBubbleOpen,
+  onToggleBubble,
+  canInstallPwa,
+  onInstallPwa,
 }) => {
   const [copied, setCopied] = useState(false);
 
@@ -124,6 +133,32 @@ export const Header: React.FC<HeaderProps> = ({
             title={user.role === 'admin' ? 'Panel de Super Admin' : 'Reclamar Super Admin'}
           >
             <Shield className="w-4 h-4" />
+          </button>
+        )}
+
+        {/* Botón Instalar App (PWA) */}
+        {canInstallPwa && onInstallPwa && (
+          <button
+            onClick={onInstallPwa}
+            className="p-2 rounded-lg bg-neural-cyan/15 hover:bg-neural-cyan/25 border border-neural-cyan/40 text-neural-cyan transition-all animate-pulse"
+            title="Instalar App en el dispositivo (PWA)"
+          >
+            <Download className="w-4 h-4" />
+          </button>
+        )}
+
+        {/* Botón Alternar Burbuja de Chat Flotante */}
+        {onToggleBubble && (
+          <button
+            onClick={onToggleBubble}
+            className={`p-2 rounded-lg border transition-all ${
+              isBubbleOpen
+                ? 'bg-gradient-to-r from-neural-purple/40 to-neural-cyan/40 border-neural-cyan text-white shadow-lg shadow-cyan-500/20'
+                : 'bg-neural-850 hover:bg-neural-800 border-neural-800 text-slate-300 hover:text-white'
+            }`}
+            title={isBubbleOpen ? 'Burbuja de chat activa (Clic para ocultar)' : 'Activar burbuja flotante de chat'}
+          >
+            <MessageCircle className="w-4 h-4" />
           </button>
         )}
 
